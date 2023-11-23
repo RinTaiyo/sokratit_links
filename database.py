@@ -51,11 +51,11 @@ def register(log, passw):
     connect.commit()
     connect.close()
 
-def selectUser(login, password):
+def selectUser(login):
     conn = sqlite3.connect(path)
     cursor = conn.cursor()
-    query = "SELECT * FROM users WHERE login = ? AND password = ?"
-    cursor.execute(query, (login, password))
+    query = "SELECT * FROM users WHERE login = ? "
+    cursor.execute(query, (login,))
     result = cursor.fetchone()
     return result
 def deleteLk():
