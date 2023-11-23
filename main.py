@@ -4,9 +4,12 @@ import sqlite3
 import flask
 from flask import Flask, render_template, request, session, redirect, jsonify
 from flask_jwt_extended import create_access_token, JWTManager, get_jwt_identity, jwt_required
+from werkzeug.security import generate_password_hash, check_password_hash
 import database as db
 
 app = Flask(__name__)
+app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
+jwt = JWTManager(app)
 db.create()
 
 
@@ -29,51 +32,47 @@ def register():
     password = request.json.get("password", None)
     print(login, password)
 
-    result=db.selectUser(login,password)
+    result = db.selectUser(login)
 
     if result:
-        print("Пользователь уже зарегистрирован")
+        return "Пользователь уже зарегистрирован"
     else:
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
-        db.register(login,password)
+        password_hash = generate_password_hash(password)
+        db.register(login,password_hash)
         return "success"
 
 
 
 
-@app.route('/aut', methods=['GET'])
+@app.route('/aut', methods=['GET', 'POST'])
 def aut():
-    conn= sqlite3.connect('database.py')
+    login = request.json.get("login", None)
+    password = request.json.get("password", None)
 
-
-
-    cursor = conn.cursor()
-
-    login = input("Введите логин: ")
-    password = input("Введите пароль: ")
-
-    query = "SELECT * FROM users WHERE login = ? AND password = ?"
-    cursor.execute(query, (login, password))
-    result = cursor.fetchone()
-
-    if result:
-        print("Вы авторизованы")
+    result = db.selectUser(login)
+    print(result)
+    if result and check_password_hash(result[2], password):
+        token=create_access_token(identity=login)
+        return f"Вы авторизованы\n{token}"
     else:
-        print("Неправильный логин или пароль")
+        return "Неправильный логин или пароль"
 
-    conn.close()
+
 
 
 @app.route('/lk', methods=['POST', 'GET', 'PUT', 'DELETE'])
+@jwt_required()
 def lk():
-    if request.method=='POST':
-        pass
-    elif request.method=='DELETE':
+    if request.method == 'POST':
+        db.sokrat()
+    elif request.method == 'DELETE':
         db.deleteLk()
-    elif request.method=='GET':
+    elif request.method == 'GET':
+        user=get_jwt_identity()
+        print(user)
         db.watchLk()
-    elif request.method=='PUT':
-       pass
+    elif request.method == 'PUT':
+        db.putLk()
 
 @app.route('/<link>', methods=['GET'])
 def red(link):
@@ -82,7 +81,6 @@ def red(link):
         return redirect(end)
     else:
         return "not found"
-
 
 if __name__ == '__main__':
     app.run(debug=True)
